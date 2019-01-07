@@ -1,0 +1,75 @@
+version: "3.5"
+
+services:
+  traefik:
+    image: traefik:1.7-alpine@sha256:cf30141936f73599e1a46355592d08c88d74bd291f05104fe11a8bcce447c044
+    read_only: yes
+    command: --api --docker --docker.exposedbydefault=false
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+      - type: bind
+        source: ./traefik.toml
+        target: /traefik.toml
+      - type: bind
+        source: ./acme.json
+        target: /acme.json
+    labels:
+      - "traefik.enable=true"
+      - "traefik.frontend.rule=Host:traefik.${HOSTNAME}"
+      - "traefik.frontend.auth.basic=admin:$$apr1$$3i7.e5C9$$nOJ6QDjZKb/PPY4lSqiUv1"
+      - "traefik.docker.network=traefik"
+      - "traefik.port=8080"
+    networks:
+      - traefik
+  pretix:
+    image: pretix/standalone:stable
+    command: all
+    labels:
+      - "traefik.enable=true"
+      - "traefik.frontend.rule=Host:${HOSTNAME}"
+      - "traefik.frontend.auth.basic=test:$$apr1$$FxGgZCER$$N6NSXms6lfcw600SWlHEm1"
+      - "traefik.docker.network=traefik"
+    networks:
+      - traefik
+      - backend
+    volumes:
+      - type: volume
+        source: pretix_data
+        target: /data
+      - type: bind
+        source: ./pretix_config
+        target: /etc/pretix
+        read_only: true
+  redis:
+    image: redis:5
+    networks:
+      - backend
+    volumes:
+      - type: volume
+        source: redis_data
+        target: /data
+  postgres:
+    image: postgres:11
+    networks:
+      - backend
+    environment:
+      POSTGRES_USER: pretix
+      POSTGRES_PASSWORD: pretix
+    volumes:
+      - type: volume
+        source: postgres_data
+        target: /var/lib/postgresql/data
+
+
+networks:
+  ? backend
+  ? traefik
+volumes:
+  ? postgres_data
+  ? pretix_data
+  ? redis_data

@@ -1,0 +1,46 @@
+systemd:
+  units:
+    - name: docker-compose.service
+      contents: |
+        [Unit]
+        Description=Install Docker Compose
+        After=docker.service network-online.target
+        Requires=docker.service network-online.target
+        ConditionPathExists=!/opt/bin/docker-compose
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/bin/mkdir -p /opt/bin
+        ExecStart=/usr/bin/curl -fSsL https://github.com/docker/compose/releases/download/1.23.0/docker-compose-Linux-x86_64 -o /opt/bin/docker-compose
+        ExecStart=/usr/bin/chmod +x /opt/bin/docker-compose
+    - name: pretix-deployment-fetch.service
+      contents: |
+        [Unit]
+        Description=Clone pretix-deployment repository
+        After=network-online.target
+        Requires=network-online.target
+        ConditionPathExists=!/srv/pretix-deployment
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStartPre=/usr/bin/mkdir -p /srv
+        ExecStart=/bin/git clone https://github.com/cfra/pretix-deployment.git /srv/pretix-deployment
+    - name: pretix.service
+      contents: |
+        [Unit]
+        Description=Pretix Service
+        After=docker-compose.service
+        After=pretix-deployment-fetch.service
+        Requires=docker-compose.service
+        Requires=pretix-deployment-fetch.service
+
+        [Service]
+        WorkingDirectory=/srv/pretix-deployment
+        ExecStart=/srv/pretix-deployment/up.sh
+        ExecStop=/opt/bin/docker-compose down
+
+        [Install]
+        WantedBy=multi-user.target
+      enabled: yes
