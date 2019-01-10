@@ -68,7 +68,9 @@ services:
 
 networks:
   ? backend
-  ? traefik
+  traefik:
+    external:
+      name: traefik
 volumes:
   ? postgres_data
   ? pretix_data
